@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0b1020">
+    <title>System Monitor</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --page: #0b1020;
+            --panel: #11182a;
+            --panel-raised: #151e33;
+            --line: #222c43;
+            --text: #edf2ff;
+            --muted: #8d99b3;
+            --green: #63e6be;
+            --blue: #70a5ff;
+            --violet: #b49aff;
+            --amber: #ffca72;
+            --red: #ff7d87;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            min-width: 320px;
+            min-height: 100vh;
+            margin: 0;
+            background:
+                radial-gradient(ellipse at 82% -10%, rgba(80, 105, 190, .16), transparent 38rem),
+                var(--page);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button { font: inherit; }
+
+        .shell { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 88px;
+            border-bottom: 1px solid rgba(141, 153, 179, .13);
+        }
+
+        .brand { display: flex; align-items: center; gap: 13px; }
+
+        .brand-mark {
+            display: grid;
+            width: 40px;
+            height: 40px;
+            place-items: center;
+            border: 1px solid rgba(99, 230, 190, .25);
+            border-radius: 12px;
+            background: rgba(99, 230, 190, .08);
+            color: var(--green);
+        }
+
+        .brand-mark svg { width: 21px; height: 21px; }
+        .brand-name { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+        .brand-subtitle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+
+        .header-actions { display: flex; align-items: center; gap: 18px; }
+
+        .live-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #b3c0d8;
+            font-size: 12px;
+        }
+
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 12px rgba(99, 230, 190, .65);
+        }
+
+        .refresh-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border: 1px solid var(--line);
+            border-radius: 9px;
+            background: var(--panel);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 12px;
+            transition: border-color .2s, background .2s;
+        }
+
+        .refresh-button:hover { border-color: #465474; background: var(--panel-raised); }
+        .refresh-button:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+        .refresh-button svg { width: 14px; height: 14px; color: #a9b5cb; }
+        .refresh-button:disabled { cursor: wait; opacity: .7; }
+
+        main { padding: 42px 0 54px; }
+
+        .eyebrow {
+            margin: 0 0 9px;
+            color: var(--green);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+
+        h1 { margin: 0; font-size: clamp(26px, 4vw, 36px); letter-spacing: -.045em; }
+
+        .intro {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 27px;
+        }
+
+        .intro-copy { max-width: 560px; margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+
+        .snapshot {
+            flex: 0 0 auto;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: right;
+        }
+
+        .snapshot strong { display: block; margin-top: 5px; color: #dce5f7; font-weight: 550; }
+
+        .overview {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 15px;
+            margin-bottom: 18px;
+        }
+
+        .metric-card, .panel {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: linear-gradient(145deg, rgba(21, 30, 51, .94), rgba(17, 24, 42, .94));
+            box-shadow: 0 12px 35px rgba(0, 0, 0, .12);
+        }
+
+        .metric-card { min-height: 155px; padding: 19px 20px 17px; }
+
+        .metric-heading { display: flex; align-items: center; justify-content: space-between; }
+        .metric-name { display: flex; align-items: center; gap: 9px; color: #c4cee1; font-size: 13px; font-weight: 550; }
+        .metric-icon { width: 17px; height: 17px; }
+        .metric-value { margin-top: 16px; font-size: 33px; font-weight: 650; letter-spacing: -.055em; }
+        .metric-value span { margin-left: 2px; color: #aab5cb; font-size: 18px; font-weight: 500; }
+        .metric-footer { display: flex; justify-content: space-between; gap: 8px; margin-top: 9px; color: var(--muted); font-size: 11px; }
+        .metric-status { font-weight: 600; }
+
+        .cpu .metric-icon, .cpu .metric-status { color: var(--blue); }
+        .memory .metric-icon, .memory .metric-status { color: var(--violet); }
+        .disk .metric-icon, .disk .metric-status { color: var(--green); }
+        .metric-card.warning .metric-status { color: var(--amber); }
+        .metric-card.critical .metric-status { color: var(--red); }
+
+        .content-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(270px, .9fr); gap: 18px; }
+        .panel { padding: 22px; }
+
+        .panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+        .panel-title { margin: 0; font-size: 15px; font-weight: 620; letter-spacing: -.015em; }
+        .panel-description { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+        .scale-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+        .chart { margin-top: 27px; }
+        .chart-row { display: grid; grid-template-columns: 90px minmax(0, 1fr) 48px; align-items: center; gap: 13px; margin: 0 0 25px; }
+        .chart-row:last-of-type { margin-bottom: 18px; }
+        .chart-label { color: #c4cee1; font-size: 12px; }
+
+        .track {
+            position: relative;
+            height: 10px;
+            overflow: visible;
+            border-radius: 99px;
+            background: #202a40;
+        }
+
+        .track::before, .track::after {
+            position: absolute;
+            top: -3px;
+            bottom: -3px;
+            width: 1px;
+            background: rgba(141, 153, 179, .17);
+            content: "";
+            pointer-events: none;
+        }
+
+        .track::before { left: 50%; }
+        .track::after { left: 100%; }
+
+        .threshold {
+            position: absolute;
+            z-index: 1;
+            top: -5px;
+            bottom: -5px;
+            width: 2px;
+            border-left: 1px dashed rgba(255, 202, 114, .9);
+            pointer-events: none;
+        }
+
+        .bar {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            transition: width .55s cubic-bezier(.2, .75, .3, 1);
+        }
+
+        .bar.cpu { background: linear-gradient(90deg, #557fe0, var(--blue)); }
+        .bar.memory { background: linear-gradient(90deg, #8b70d7, var(--violet)); }
+        .bar.disk { background: linear-gradient(90deg, #34b99b, var(--green)); }
+        .bar.warning { background: linear-gradient(90deg, #d69a45, var(--amber)); }
+        .bar.critical { background: linear-gradient(90deg, #d85669, var(--red)); }
+
+        .chart-value { color: #edf2ff; font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+        .axis { display: flex; justify-content: space-between; padding-left: 103px; padding-right: 47px; color: #75819b; font-size: 10px; }
+        .legend { display: flex; align-items: center; gap: 7px; margin-top: 19px; color: var(--muted); font-size: 11px; }
+        .legend-mark { width: 13px; height: 0; border-top: 1px dashed var(--amber); }
+
+        .insight-panel { display: flex; flex-direction: column; }
+
+        .health-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 19px;
+            padding: 12px;
+            border: 1px solid rgba(99, 230, 190, .16);
+            border-radius: 10px;
+            background: rgba(99, 230, 190, .055);
+            color: #c6f5e7;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.45;
+        }
+
+        .health-banner.warning { border-color: rgba(255, 202, 114, .2); background: rgba(255, 202, 114, .06); color: #ffe0aa; }
+        .health-banner.critical { border-color: rgba(255, 125, 135, .23); background: rgba(255, 125, 135, .07); color: #ffb8be; }
+
+        .health-symbol {
+            display: grid;
+            flex: 0 0 24px;
+            width: 24px;
+            height: 24px;
+            place-items: center;
+            border-radius: 50%;
+            background: rgba(99, 230, 190, .12);
+            color: var(--green);
+            font-size: 13px;
+        }
+
+        .health-banner.warning .health-symbol { background: rgba(255, 202, 114, .13); color: var(--amber); }
+        .health-banner.critical .health-symbol { background: rgba(255, 125, 135, .13); color: var(--red); }
+
+        .insight-copy { min-height: 54px; margin: 15px 0 17px; color: #aeb9ce; font-size: 12px; line-height: 1.65; }
+        .divider { height: 1px; background: var(--line); }
+        .limits-title { margin: 17px 0 12px; color: #c4cee1; font-size: 11px; font-weight: 600; }
+        .limit-row { display: flex; justify-content: space-between; margin: 0 0 9px; color: var(--muted); font-size: 11px; }
+        .limit-row strong { color: #dce5f7; font-weight: 550; }
+
+        .notice {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            margin-top: 17px;
+            padding: 11px 12px;
+            border-radius: 9px;
+            background: rgba(112, 165, 255, .06);
+            color: #aebbd4;
+            font-size: 11px;
+            line-height: 1.55;
+        }
+
+        .notice svg { flex: 0 0 14px; width: 14px; height: 14px; margin-top: 1px; color: var(--blue); }
+
+        .error-message {
+            display: none;
+            margin: 0 0 18px;
+            padding: 12px 15px;
+            border: 1px solid rgba(255, 125, 135, .26);
+            border-radius: 10px;
+            background: rgba(255, 125, 135, .07);
+            color: #ffb8be;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .error-message.visible { display: block; }
+        .loading .metric-value { color: #8390a9; }
+        .footer { margin-top: 19px; color: #65718a; font-size: 10px; text-align: center; }
+
+        @media (max-width: 760px) {
+            .shell { width: min(100% - 32px, 560px); }
+            .overview { grid-template-columns: 1fr; gap: 11px; }
+            .metric-card { min-height: 0; padding: 16px 18px; }
+            .metric-value { margin-top: 11px; font-size: 29px; }
+            .content-grid { grid-template-columns: 1fr; }
+            main { padding-top: 30px; }
+        }
+
+        @media (max-width: 480px) {
+            header { min-height: 74px; }
+            .brand-subtitle, .live-label { display: none; }
+            .header-actions { gap: 10px; }
+            .intro { align-items: flex-start; flex-direction: column; gap: 13px; }
+            .snapshot { text-align: left; }
+            .chart-row { grid-template-columns: 70px minmax(0, 1fr) 42px; gap: 9px; }
+            .axis { padding-left: 79px; padding-right: 41px; }
+            .panel { padding: 18px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <header>
+            <div class="brand">
+                <div class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12h4l2.2-6 4.1 12 2.2-6H21"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="brand-name">System Monitor</p>
+                    <p class="brand-subtitle">Linux resource overview</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span class="live-label"><span class="live-dot" aria-hidden="true"></span>Log connection</span>
+                <button class="refresh-button" id="refresh-button" type="button" aria-label="Refresh system metrics">
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M16.2 8A6.5 6.5 0 0 0 4.5 5.2L3 7"></path>
+                        <path d="M3 3.8V7h3.2M3.8 12a6.5 6.5 0 0 0 11.7 2.8L17 13"></path>
+                        <path d="M17 16.2V13h-3.2"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <section class="intro" aria-labelledby="page-title">
+                <div>
+                    <p class="eyebrow">Resource health</p>
+                    <h1 id="page-title">System overview</h1>
+                    <p class="intro-copy">A live view of the latest CPU, memory, and root disk readings from your monitor log.</p>
+                </div>
+                <div class="snapshot">Dashboard checked<strong id="checked-at">Waiting for data…</strong></div>
+            </section>
+
+            <div class="error-message" id="error-message" role="alert"></div>
+
+            <section class="overview loading" id="overview" aria-label="Current system metrics" aria-live="polite">
+                <article class="metric-card cpu" id="card-cpu">
+                    <div class="metric-heading">
+                        <div class="metric-name">
+                            <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 13h4l2-6 4 11 2-5h4"></path>
+                            </svg>
+                            CPU load
+                        </div>
+                    </div>
+                    <div class="metric-value" id="value-cpu">--<span>%</span></div>
+                    <div class="metric-footer"><span>Alert limit: 80%</span><span class="metric-status" id="status-cpu">Loading</span></div>
+                </article>
+
+                <article class="metric-card memory" id="card-memory">
+                    <div class="metric-heading">
+                        <div class="metric-name">
+                            <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="4" y="6" width="16" height="12" rx="2"></rect><path d="M8 10v4m4-4v4m4-4v4M2 9v6m20-6v6"></path>
+                            </svg>
+                            Memory
+                        </div>
+                    </div>
+                    <div class="metric-value" id="value-memory">--<span>%</span></div>
+                    <div class="metric-footer"><span>Alert limit: 80%</span><span class="metric-status" id="status-memory">Loading</span></div>
+                </article>
+
+                <article class="metric-card disk" id="card-disk">
+                    <div class="metric-heading">
+                        <div class="metric-name">
+                            <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3.5" y="4" width="17" height="16" rx="2"></rect><path d="M7 8h10M7 12h10M7 16h6"></path><circle cx="17" cy="16" r=".7" fill="currentColor"></circle>
+                            </svg>
+                            Root disk
+                        </div>
+                    </div>
+                    <div class="metric-value" id="value-disk">--<span>%</span></div>
+                    <div class="metric-footer"><span>Alert limit: 90%</span><span class="metric-status" id="status-disk">Loading</span></div>
+                </article>
+            </section>
+
+            <section class="content-grid" aria-label="Usage chart and system insights">
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2 class="panel-title">Resource utilization</h2>
+                            <p class="panel-description">Current usage compared with each monitor alert limit.</p>
+                        </div>
+                        <span class="scale-note">Scale: 0–100%</span>
+                    </div>
+
+                    <div class="chart" role="img" aria-label="Horizontal chart of current CPU, memory, and disk usage">
+                        <div class="chart-row">
+                            <span class="chart-label">CPU load</span>
+                            <div class="track"><div class="bar cpu" id="bar-cpu"></div><span class="threshold" style="left: 80%" aria-hidden="true"></span></div>
+                            <span class="chart-value" id="chart-cpu">--%</span>
+                        </div>
+                        <div class="chart-row">
+                            <span class="chart-label">Memory</span>
+                            <div class="track"><div class="bar memory" id="bar-memory"></div><span class="threshold" style="left: 80%" aria-hidden="true"></span></div>
+                            <span class="chart-value" id="chart-memory">--%</span>
+                        </div>
+                        <div class="chart-row">
+                            <span class="chart-label">Root disk</span>
+                            <div class="track"><div class="bar disk" id="bar-disk"></div><span class="threshold" style="left: 90%" aria-hidden="true"></span></div>
+                            <span class="chart-value" id="chart-disk">--%</span>
+                        </div>
+                        <div class="axis" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div>
+                    </div>
+                    <div class="legend"><span class="legend-mark" aria-hidden="true"></span>Dashed marker = alert limit</div>
+                </article>
+
+                <aside class="panel insight-panel" aria-labelledby="insight-title">
+                    <div class="panel-header">
+                        <div>
+                            <h2 class="panel-title" id="insight-title">At a glance</h2>
+                            <p class="panel-description">A quick read on the latest snapshot.</p>
+                        </div>
+                    </div>
+                    <div class="health-banner" id="health-banner">
+                        <span class="health-symbol" id="health-symbol" aria-hidden="true">✓</span>
+                        <span id="health-title">Waiting for readings</span>
+                    </div>
+                    <p class="insight-copy" id="insight-copy">Reading the latest metrics from data/data.log…</p>
+                    <div class="divider"></div>
+                    <p class="limits-title">Configured alert limits</p>
+                    <p class="limit-row"><span>CPU load</span><strong>80%</strong></p>
+                    <p class="limit-row"><span>Memory</span><strong>80%</strong></p>
+                    <p class="limit-row"><span>Root disk</span><strong>90%</strong></p>
+                    <div class="notice">
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="10" cy="10" r="7.5"></circle><path d="M10 9v4m0-6h.01"></path>
+                        </svg>
+                        <span>This log stores only the latest sample. The chart compares current usage; it does not represent historical trends.</span>
+                    </div>
+                </aside>
+            </section>
+            <p class="footer">Metrics refresh automatically every 30 seconds · monitor log updates every 5 minutes</p>
+        </main>
+    </div>
+
+    <script>
+        const metrics = [
+            { key: "cpu", label: "CPU load", pattern: /CPU Load:\s*(\d+(?:\.\d+)?)%/i, limit: 80 },
+            { key: "memory", label: "Memory", pattern: /Memory Usage:\s*(\d+(?:\.\d+)?)%/i, limit: 80 },
+            { key: "disk", label: "Root disk", pattern: /Disk Usage:\s*(\d+(?:\.\d+)?)%/i, limit: 90 }
+        ];
+
+        const refreshButton = document.getElementById("refresh-button");
+        const errorMessage = document.getElementById("error-message");
+
+        function setError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add("visible");
+        }
+
+        function clearError() {
+            errorMessage.textContent = "";
+            errorMessage.classList.remove("visible");
+        }
+
+        function parseLog(text) {
+            const values = {};
+            for (const metric of metrics) {
+                const match = text.match(metric.pattern);
+                if (!match) {
+                    throw new Error(`The log is missing a valid ${metric.label} reading.`);
+                }
+
+                const value = Number(match[1]);
+                if (!Number.isFinite(value) || value < 0 || value > 100) {
+                    throw new Error(`The ${metric.label} reading must be between 0% and 100%.`);
+                }
+                values[metric.key] = value;
+            }
+            return values;
+        }
+
+        function render(values) {
+            document.getElementById("overview").classList.remove("loading");
+
+            const readings = metrics.map(metric => ({
+                ...metric,
+                value: values[metric.key],
+                state: values[metric.key] > metric.limit
+                    ? "critical"
+                    : values[metric.key] >= metric.limit * 0.8
+                        ? "warning"
+                        : "normal"
+            }));
+
+            for (const reading of readings) {
+                const { key, value, limit, state } = reading;
+                document.getElementById(`value-${key}`).innerHTML = `${value}<span>%</span>`;
+                document.getElementById(`chart-${key}`).textContent = `${value}%`;
+                document.getElementById(`status-${key}`).textContent =
+                    state === "critical" ? "Above limit" : state === "warning" ? "Near limit" : "Normal";
+
+                const card = document.getElementById(`card-${key}`);
+                card.classList.toggle("warning", state === "warning");
+                card.classList.toggle("critical", state === "critical");
+
+                const bar = document.getElementById(`bar-${key}`);
+                bar.style.width = `${value}%`;
+                bar.classList.toggle("warning", state === "warning");
+                bar.classList.toggle("critical", state === "critical");
+                bar.setAttribute("aria-label", `${reading.label}: ${value} percent; alert limit ${limit} percent`);
+            }
+
+            const highest = [...readings].sort((a, b) => b.value - a.value)[0];
+            const critical = readings.filter(reading => reading.state === "critical");
+            const warning = readings.filter(reading => reading.state === "warning");
+            const banner = document.getElementById("health-banner");
+            const symbol = document.getElementById("health-symbol");
+            const title = document.getElementById("health-title");
+            const copy = document.getElementById("insight-copy");
+
+            banner.classList.toggle("critical", critical.length > 0);
+            banner.classList.toggle("warning", critical.length === 0 && warning.length > 0);
+
+            if (critical.length > 0) {
+                symbol.textContent = "!";
+                title.textContent = `${critical.map(reading => reading.label).join(", ")} over alert limit`;
+                copy.textContent = `${highest.label} is highest at ${highest.value}% (limit ${highest.limit}%). Check the system before this resource becomes constrained.`;
+            } else if (warning.length > 0) {
+                symbol.textContent = "!";
+                title.textContent = `${warning.map(reading => reading.label).join(", ")} nearing limit`;
+                copy.textContent = `${highest.label} is the most utilized resource at ${highest.value}%. It is approaching its ${highest.limit}% alert limit.`;
+            } else {
+                symbol.textContent = "✓";
+                title.textContent = "All resources within limits";
+                copy.textContent = `${highest.label} is currently the most utilized at ${highest.value}%. All monitored resources remain below their alert limits.`;
+            }
+
+            document.getElementById("checked-at").textContent =
+                new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }).format(new Date());
+        }
+
+        async function refreshMetrics() {
+            refreshButton.disabled = true;
+            clearError();
+            try {
+                const response = await fetch(`data/data.log?refresh=${Date.now()}`, { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(`Could not load data/data.log (HTTP ${response.status}).`);
+                }
+                const values = parseLog(await response.text());
+                render(values);
+            } catch (error) {
+                setError(`${error.message} Start a local web server from the project folder (for example, python3 -m http.server 8000) and open http://localhost:8000.`);
+            } finally {
+                refreshButton.disabled = false;
+            }
+        }
+
+        refreshButton.addEventListener("click", refreshMetrics);
+        refreshMetrics();
+        window.setInterval(refreshMetrics, 30000);
+    </script>
+</body>
+</html>
